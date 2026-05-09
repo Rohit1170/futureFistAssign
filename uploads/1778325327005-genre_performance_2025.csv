@@ -1,0 +1,7 @@
+genre,total_titles,total_viewers,avg_completion_rate,avg_rating,total_revenue_usd,marketing_spend_usd,roi
+Sci-Fi,4,12800000,79,8.3,28500000,8000000,3.6
+Drama,3,10200000,82,8.1,24100000,6500000,3.7
+Action,2,8600000,61,7.7,18200000,7000000,2.6
+Thriller,2,7100000,76,7.4,15800000,5500000,2.9
+Adventure,2,5200000,68,7.1,11000000,4000000,2.8
+Comedy,3,3100000,48,6.2,6200000,3500000,0.8

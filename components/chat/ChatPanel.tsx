@@ -1,10 +1,41 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
-import { ToolTracePanel } from './ToolTracePanel';
 import { Card } from '@/components/ui/card';
+
+interface RateLimitInfo {
+  requestsRemaining: number;
+  requestsLimit: number;
+  tokensRemaining: number;
+  tokensLimit: number;
+  resetsIn: string;
+  isLimited: boolean;
+}
+
+function RateLimitBar({ info }: { info: RateLimitInfo | null }) {
+  if (!info) return null;
+  const { requestsRemaining, requestsLimit, resetsIn, isLimited } = info;
+
+  const isRed = isLimited || requestsRemaining < 3;
+  const isYellow = !isRed && requestsRemaining < 10;
+
+  const colorClass = isRed
+    ? 'bg-red-950/40 border-red-700/50 text-red-300'
+    : isYellow
+    ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-300'
+    : 'bg-slate-800/40 border-slate-700/50 text-slate-400';
+
+  return (
+    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs mb-2 ${colorClass}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${isRed ? 'bg-red-400' : isYellow ? 'bg-yellow-400' : 'bg-green-400'}`} />
+      {isLimited
+        ? `⚠ Rate limited${resetsIn ? ` — resets in ${resetsIn}` : ''}`
+        : `API: ${requestsRemaining}/${requestsLimit} requests remaining${resetsIn ? ` • resets in ${resetsIn}` : ''}`}
+    </div>
+  );
+}
 
 export interface Message {
   id: string;
@@ -12,6 +43,7 @@ export interface Message {
   content: string;
   timestamp: Date;
   tools?: ToolExecution[];
+  type?: 'rate_limited';
 }
 
 export interface ToolExecution {
@@ -31,8 +63,21 @@ export function ChatPanel() {
     },
   ]);
   const [loading, setLoading] = useState(false);
-  const [selectedToolTrace, setSelectedToolTrace] = useState<ToolExecution[] | null>(null);
+  const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const fetchRateLimit = useCallback(() => {
+    fetch('/api/groq/rate-limit')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d && !d.error) setRateLimitInfo(d); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchRateLimit();
+    const interval = setInterval(fetchRateLimit, 10_000);
+    return () => clearInterval(interval);
+  }, [fetchRateLimit]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -73,19 +118,23 @@ export function ChatPanel() {
           timestamp: new Date(),
           tools: data.tools,
         };
-
         setMessages((prev) => [...prev, assistantMessage]);
-        if (data.tools) {
-          setSelectedToolTrace(data.tools);
-        }
+      } else if (response.status === 429 || data.error === 'rate_limited') {
+        const retryAfter = data.retryAfter ?? 30;
+        setMessages((prev) => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          type: 'rate_limited',
+          content: `Rate limit reached — I need a short break!\nThe AI service allows limited requests per minute. Please wait ~${retryAfter} seconds and try again.`,
+          timestamp: new Date(),
+        }]);
       } else {
-        const errorMessage: Message = {
+        setMessages((prev) => [...prev, {
           id: Date.now().toString(),
           role: 'assistant',
           content: `Error: ${data.error || 'Failed to process your question'}`,
           timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
+        }]);
       }
     } catch (error) {
       console.error('[v0] Chat error:', error);
@@ -98,12 +147,12 @@ export function ChatPanel() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+      fetchRateLimit();
     }
   };
 
   return (
-    <div className="flex gap-6 h-full">
-      {/* Chat Area */}
+    <div className="flex h-full">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="flex-1 overflow-auto mb-4 space-y-4 pr-4">
           {messages.map((message) => (
@@ -121,14 +170,10 @@ export function ChatPanel() {
         </div>
 
         <div className="mt-auto">
+          <RateLimitBar info={rateLimitInfo} />
           <ChatInput onSendMessage={handleSendMessage} disabled={loading} />
         </div>
       </div>
-
-      {/* Tool Trace Panel */}
-      {selectedToolTrace && selectedToolTrace.length > 0 && (
-        <ToolTracePanel tools={selectedToolTrace} />
-      )}
     </div>
   );
 }

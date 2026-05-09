@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm install *)",
       "Bash(npm list *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\HP\\\\Desktop\\\\futureFirst\" -Force)",
+      "Bash(Select-Object -Property Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)"
     ]
   }
 }

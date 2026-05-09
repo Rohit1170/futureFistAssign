@@ -37,6 +37,8 @@ export function ChatMessage({ message }: { message: Message }) {
             className={`px-4 py-3 ${
               isUser
                 ? 'bg-blue-600 border-blue-500/50 text-white'
+                : message.type === 'rate_limited'
+                ? 'bg-yellow-950/40 border-yellow-700/50 text-yellow-200'
                 : 'bg-slate-800/50 border-slate-700 text-slate-200'
             }`}
           >

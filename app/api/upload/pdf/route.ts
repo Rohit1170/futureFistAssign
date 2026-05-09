@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 import UploadedDocument from '@/models/UploadedDocument';
 import connectDB from '@/lib/mongodb';
 
@@ -25,22 +24,26 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const pdfData = await pdfParse(buffer);
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const textResult = await parser.getText();
+    await parser.destroy();
 
     // Create chunks from PDF text
-    const text = pdfData.text;
-    const chunks = chunkText(text, 500, 50); // 500 token chunks with 50 token overlap
+    const text = textResult.text;
+    const pageCount = textResult.total;
+    const chunks = chunkText(text, 500, 50);
 
     // Create simple embeddings
     const chunksWithEmbeddings = chunks.map((chunk) => ({
       text: chunk,
       embedding: simpleEmbedding(chunk),
-      pageNumber: Math.ceil(chunk.length / 3000), // Rough estimate
+      pageNumber: Math.ceil(chunk.length / 3000),
     }));
 
     // Save file
     await connectDB();
     const uploadsDir = join(process.cwd(), 'uploads');
+    await mkdir(uploadsDir, { recursive: true });
     const fileName = `${Date.now()}-${file.name}`;
     const filePath = join(uploadsDir, fileName);
 
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
       uploadedBy: userId,
       chunks: chunksWithEmbeddings,
       metadata: {
-        pageCount: pdfData.numpages,
+        pageCount,
         fileSize: file.size,
       },
     });
@@ -67,7 +70,7 @@ export async function POST(request: NextRequest) {
         document: {
           id: document._id,
           name: document.name,
-          pageCount: pdfData.numpages,
+          pageCount,
           chunkCount: chunks.length,
         },
       },

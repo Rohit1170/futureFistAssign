@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import Papa from 'papaparse';
 import UploadedDocument from '@/models/UploadedDocument';
@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    if (file.type !== 'text/csv') {
+    const csvMimeTypes = ['text/csv', 'application/csv', 'application/vnd.ms-excel', 'text/plain', 'text/comma-separated-values'];
+    const isCsv = csvMimeTypes.includes(file.type) || file.name.toLowerCase().endsWith('.csv');
+    if (!isCsv) {
       return NextResponse.json({ error: 'Only CSV files are supported' }, { status: 400 });
     }
 
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
     // Save file
     await connectDB();
     const uploadsDir = join(process.cwd(), 'uploads');
+    await mkdir(uploadsDir, { recursive: true });
     const fileName = `${Date.now()}-${file.name}`;
     const filePath = join(uploadsDir, fileName);
 

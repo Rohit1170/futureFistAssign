@@ -53,8 +53,18 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('[v0] Chat error:', error);
+    if (error?.message?.startsWith('RATE_LIMIT_EXCEEDED')) {
+      return NextResponse.json(
+        {
+          error: 'rate_limited',
+          message: 'Groq API rate limit reached. Please wait 30 seconds and try again.',
+          retryAfter: 30,
+        },
+        { status: 429 }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to process message', details: String(error) },
       { status: 500 }

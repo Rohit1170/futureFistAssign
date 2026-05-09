@@ -61,7 +61,6 @@ const movieSchema = new Schema<IMovie>(
   { timestamps: true }
 );
 
-movieSchema.index({ title: 1 });
 movieSchema.index({ genre: 1 });
 movieSchema.index({ releaseDate: -1 });
 

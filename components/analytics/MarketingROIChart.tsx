@@ -1,34 +1,44 @@
 'use client';
 
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useEffect, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const data = [
-  { name: 'TV', spend: 75, revenue: 425 },
-  { name: 'Digital', spend: 62, revenue: 320 },
-  { name: 'Print', spend: 48, revenue: 245 },
-  { name: 'Outdoor', spend: 95, revenue: 580 },
-  { name: 'Social', spend: 70, revenue: 380 },
-];
+interface ChannelData {
+  name: string;
+  spend: number;
+  conversions: number;
+  roi: number;
+}
 
 export function MarketingROIChart() {
+  const [data, setData] = useState<ChannelData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/analytics/marketing')
+      .then((r) => r.json())
+      .then((d) => { if (!d.error) setData(d); })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="h-[300px] flex items-center justify-center text-slate-400 animate-pulse">Loading...</div>;
+  if (!data.length) return <div className="h-[300px] flex items-center justify-center text-slate-400">No data available</div>;
+
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+      <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-        <XAxis dataKey="spend" name="Marketing Spend (M$)" stroke="#94a3b8" />
-        <YAxis dataKey="revenue" name="Revenue (M$)" stroke="#94a3b8" />
+        <XAxis dataKey="name" stroke="#94a3b8" style={{ fontSize: '12px' }} />
+        <YAxis stroke="#94a3b8" style={{ fontSize: '12px' }} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: '#1e293b',
-            border: '1px solid #475569',
-            borderRadius: '0.5rem',
-          }}
+          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', borderRadius: '0.5rem' }}
           labelStyle={{ color: '#f1f5f9' }}
-          cursor={{ strokeDasharray: '3 3' }}
         />
         <Legend />
-        <Scatter name="Campaign Performance" data={data} fill="#3b82f6" />
-      </ScatterChart>
+        <Bar dataKey="spend" fill="#3b82f6" name="Spend ($K)" radius={[6, 6, 0, 0]} />
+        <Bar dataKey="roi" fill="#10b981" name="ROI Score" radius={[6, 6, 0, 0]} />
+      </BarChart>
     </ResponsiveContainer>
   );
 }
